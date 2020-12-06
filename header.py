@@ -1,6 +1,7 @@
 import sys
 from ctypes import sizeof
 import time
+from pynput.keyboard import Key, Listener
 
 
 class Header:
@@ -17,3 +18,41 @@ class Header:
         self.fragment_size = fragment_size
         # 2 bytes
         self.crc = crc
+
+
+import sched, time
+s = sched.scheduler(time.time, time.sleep)
+def do_something(sc):
+    print("Doing stuff...")
+    # do your stuff
+    s.enter(2, 1, do_something, (sc,))
+
+s.enter(2, 1, do_something, (1,))
+s.run()
+
+if True:
+    s.cancel()
+
+
+# start = time.time()
+#
+#
+# def on_press(key):
+#     print('{0} pressed'.format(
+#         key))
+#
+#
+# def on_release(key):
+#     if int(time.time() - start) >= 1:
+#         print("detected")
+#     print('{0} release'.format(
+#         key))
+#     if key == Key.esc:
+#         # Stop listener
+#         return False
+#
+#
+# with Listener(
+#         on_press=on_press,
+#         on_release=on_release) as listener:
+#     listener.join()

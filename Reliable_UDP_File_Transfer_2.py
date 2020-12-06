@@ -6,9 +6,12 @@ import time
 import math
 import os
 
+
+enable_keep_alive = 0
+
 header = Struct('BBHHHH')
 headerSize = calcsize('BBHHHH')
-
+sock_t = ()
 supported_file_types_codes = {
     ".txt": 2,
     ".pdf": 3
@@ -43,46 +46,11 @@ host = "127.0.0.1"
 port = 55555
 seq = 1
 
-
-def keepAlive(sock, address, mode):
-    start_execuation = time.time()
-    global keep_alive
-    time.sleep(1)
-    if mode == "c":
-        keepAlive_packet_send = header.pack(12, 1, 0, 0, 0, 0)
-        sock.sendto(keepAlive_packet_send, address)
-        print("A keep alive packet is being sent from sender every 1 sec")
-        if time.time() - 10 < start_execuation:
-            data, address_r = sock.recvfrom(1500)
-            headerInfo = header.unpack(data)
-            if headerInfo[0] == 12:
-                keep_alive = True
-                start_execuation = time.time()
-        else:
-            keep_alive = False
-
-
-    elif mode == "s":
-        if time.time() - 10 < start_execuation:
-            data, address_r = sock.recvfrom(1500)
-            headerInfo = header.unpack(data)
-            if headerInfo[0] == 12:
-                keepAlive_packet_send = header.pack(12, 1, 0, 0, 0, 0)
-                sock.sendto(keepAlive_packet_send, address)
-                print("A keep alive packet is being sent from the receiver every 1 sec")
-                keep_alive = True
-                start_execuation = time.time()
-            else:
-                keep_alive = False
-
-        return keep_alive
-
-
 # def sendTextAsOnePartOrMulti(textToBeSent):
 
 
 def sender():
-    global seq, fragment_size, time_out, defaultFileDir, current_fileTypeCode
+    global seq, fragment_size, time_out, defaultFileDir, current_fileTypeCode, enable_keep_alive,sock_t
     print('Mode is Sender ...')
     host_l = input('Please enter destination address:  ')
     port_l = input('Please enter destination port:  ')
@@ -96,6 +64,7 @@ def sender():
                 .format(min_fragment_size, max_fragment_size)))
 
     sock = sc.socket(sc.AF_INET, sc.SOCK_DGRAM)
+    sock_t = (sock,address)
     syn_3 = header.pack(2, 1, seq, 0, 0, 0)
     sock.sendto(syn_3, address)
     print("SYN Sent")
@@ -109,7 +78,7 @@ def sender():
             ack_3 = header.pack(4, 1, seq, 0, 0, 0)
             print("Send ACK ")
             sock.sendto(ack_3, address)
-
+            enable_keep_alive = 1
             while True:
                 # connection established
                 print("1 -Text")
@@ -117,12 +86,14 @@ def sender():
                  # measure for the time, if greater than 1 sec, send keep-alive
                 menu = input("Choose what would like to send : ")
                 if menu == '1':
+                    enable_keep_alive = 0
                     print("Sending Text ......")
                     textToBeSent = input("Enter the text would you like to send safely : ")
                     # is it necessary to fragment the text
                     lengthOfTheText = len(textToBeSent)
                     # if no, send normally
                     if lengthOfTheText <= fragment_size:
+
                         # if no, send normally
                         data = textToBeSent.encode()
                         crcValue = binascii.crc_hqx(data, 0)
@@ -147,7 +118,6 @@ def sender():
                                 headerInfo = header.unpack(packet[:headerSize])
                             else:
                                 print('Text has been received with some thing idk')
-
                     else:
                         # if yes, we need fragmentation and sending it one by one
                         print('we need fragmentation and sending it one by one')
@@ -190,11 +160,12 @@ def sender():
                             print("The text has been received successfully")
                         else:
                             print("The text has been received with errors")
+                    enable_keep_alive = 1
                 elif menu == '2':
+                    enable_keep_alive = 0
                     enable_simulation = input("Would you like to simulate of file transfer error, (Y)es, (N)o ")
                     if enable_simulation == "Y":
                         print("some random data would be inserted instead of a real packet")
-
                     print("Sending File ........")
                     filelocation = input(
                         "Enter the File location where your file exits (Default) {}:".format(defaultFileDir))
@@ -322,7 +293,7 @@ def sender():
                             print("The text has been received successfully")
                         else:
                             print("The text has been received with errors")
-
+                    enable_keep_alive = 1
                 else:
                     continue
 
@@ -330,6 +301,7 @@ def sender():
 def receiver():
     print('Mode is Receiver ...')
     global host, port, seq, fragment_size, headerSize, fullText, currentFileExtention, serverBuffer
+
     address = (host, port)
     sock = sc.socket(sc.AF_INET, sc.SOCK_DGRAM)
     sock.bind(address)
@@ -528,25 +500,50 @@ def receiver():
                                                                                                    fileNameAtRecevier))
                         else:
                             print("Unexpected Behaviour")
-
+                elif headerInfo[0] == 14:
+                     keep_alive_pckt = header.pack(14, 1, 0, 0, 0, 0)
+                     sock.sendto(keep_alive_pckt,address)
 
 def extractFileInfoFromPdf(buffer):
     foundAtIndex = -1
     for x in range(0, len(buffer), 1):
         if buffer[x:x + 4].decode() == '.pdf':
             foundAtIndex = x
-            break;
+            break
         else:
             foundAtIndex = -1
     return foundAtIndex
 
+import threading
+start = time.time()
 
+def run_keep_alive():
+    global enable_keep_alive,sock_t
+    while True:
+        if enable_keep_alive == 1:
+            print(sock_t[0])
+            try:
+                keep_alive_pckt = header.pack(14, 1, 0, 0, 0, 0)
+                sock_t[0].sendto(keep_alive_pckt,sock_t[1])
+                print("\n Alive")
+                packet, address_r = sock_t[0].recvfrom(1500)
+            except:
+                print("sock not init")
+        time.sleep(3)
+
+def my_inline_function():
+    # do some stuff
+    download_thread = threading.Thread(target=run_keep_alive, name="keep alive")
+    download_thread.start()
+    # continue doing stuff
 def main():
-    global min_fragment_size, max_fragment_size
+    global min_fragment_size, max_fragment_size,enable_keep_alive
     print("1- Server")
     print("2- Client")
 
+    my_inline_function()
     while True:
+
         mode = input("Please choose your mode (1 or 2): ")
         if mode == "1":
             receiver()
@@ -556,9 +553,6 @@ def main():
             break
         else:
             print("You've entered a bad mode, please choose correctly")
-            continue
-
-    return
 
 
 if __name__ == "__main__":
