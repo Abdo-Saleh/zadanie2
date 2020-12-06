@@ -14,7 +14,8 @@ headerSize = calcsize('BBHHHH')
 sock_t = ()
 supported_file_types_codes = {
     ".txt": 2,
-    ".pdf": 3
+    ".pdf": 3,
+    ".jpg": 4
 }
 current_fileTypeCode = supported_file_types_codes[".txt"]
 
@@ -33,6 +34,7 @@ fragment_size = 1
 
 TXT = ".txt"
 PDF = ".pdf"
+JPG = ".jpg"
 
 keep_alive = True
 
@@ -43,11 +45,17 @@ currentFileExtention = TXT
 serverBuffer = bytearray()
 
 host = "127.0.0.1"
-port = 55555
+port = 12345
 seq = 1
 
 # def sendTextAsOnePartOrMulti(textToBeSent):
 
+def senderSocket():
+    return
+
+def receiverSocket(address, port):
+
+    return
 
 def sender():
     global seq, fragment_size, time_out, defaultFileDir, current_fileTypeCode, enable_keep_alive,sock_t
@@ -55,13 +63,6 @@ def sender():
     host_l = input('Please enter destination address:  ')
     port_l = input('Please enter destination port:  ')
     address = (host_l, int(port_l))
-    fragment_size = int(input('Please enter fragment size which must be bigger than {} and less than {} :'
-                              .format(min_fragment_size, max_fragment_size)))
-
-    while fragment_size < min_fragment_size or fragment_size > max_fragment_size:
-        fragment_size = int(input(
-            'You have entered  a bad fragment size, please make sure to enter a value bigger than {} and less than {} :'
-                .format(min_fragment_size, max_fragment_size)))
 
     sock = sc.socket(sc.AF_INET, sc.SOCK_DGRAM)
     sock_t = (sock,address)
@@ -85,6 +86,15 @@ def sender():
                 print("2 -File")
                  # measure for the time, if greater than 1 sec, send keep-alive
                 menu = input("Choose what would like to send : ")
+
+                fragment_size = int(input('Please enter fragment size which must be bigger than {} and less than {} :'
+                                          .format(min_fragment_size, max_fragment_size)))
+
+                while fragment_size < min_fragment_size or fragment_size > max_fragment_size:
+                    fragment_size = int(input(
+                        'You have entered  a bad fragment size, please make sure to enter a value bigger than {} and less than {} :'
+                            .format(min_fragment_size, max_fragment_size)))
+
                 if menu == '1':
                     enable_keep_alive = 0
                     print("Sending Text ......")
@@ -396,6 +406,8 @@ def receiver():
                         currentFileExtention = TXT
                     elif headerInfo[1] == 3:
                         currentFileExtention = PDF
+                    elif headerInfo[1] == 4:
+                        currentFileExtention = JPG
                     else:
                         currentFileExtention
                     # receiving .txt file
@@ -476,8 +488,8 @@ def receiver():
                             receivedFile = serverBuffer
                             fileNameAtRecevier = ""
                             fileContent = bytearray()
-                            if currentFileExtention == '.pdf':
-                                x = extractFileInfoFromPdf(serverBuffer)
+                            if currentFileExtention == '.pdf' or currentFileExtention == '.jpg':
+                                x = extractFileInfoFromPdfJpg(serverBuffer)
                                 fileNameAtRecevier = serverBuffer[:x].decode()
                                 fileContent = serverBuffer[x + 4:]
                             else:
@@ -487,7 +499,7 @@ def receiver():
                             print("The file has been received successfully")
                             try:
                                 f = open(fileNameAtRecevier + currentFileExtention, 'wb')
-                                if currentFileExtention == '.pdf':
+                                if currentFileExtention == '.pdf' or currentFileExtention == '.jpg' :
                                     f.write(fileContent)
                                 else:
                                     f.write(fileContent.encode())
@@ -504,10 +516,10 @@ def receiver():
                      keep_alive_pckt = header.pack(14, 1, 0, 0, 0, 0)
                      sock.sendto(keep_alive_pckt,address)
 
-def extractFileInfoFromPdf(buffer):
+def extractFileInfoFromPdfJpg(buffer):
     foundAtIndex = -1
     for x in range(0, len(buffer), 1):
-        if buffer[x:x + 4].decode() == '.pdf':
+        if buffer[x:x + 4].decode() == '.pdf' or buffer[x:x + 4].decode() == '.jpg':
             foundAtIndex = x
             break
         else:
