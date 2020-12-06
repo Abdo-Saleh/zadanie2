@@ -5,6 +5,7 @@ from struct import *
 import time
 import math
 import os
+import threading
 
 enable_keep_alive = 0
 
@@ -17,6 +18,8 @@ supported_file_types_codes = {
     ".jpg": 4
 }
 current_fileTypeCode = supported_file_types_codes[".txt"]
+
+value = 0
 
 fullText = ""
 
@@ -50,7 +53,7 @@ seq = 1
 
 # def sendTextAsOnePartOrMulti(textToBeSent):
 
-def senderSocket(host_l,port_l):
+def senderSocket(host_l, port_l):
     global sock_t
     address = (host_l, int(port_l))
     sock = sc.socket(sc.AF_INET, sc.SOCK_DGRAM)
@@ -69,12 +72,16 @@ def senderSocket(host_l,port_l):
             print("Send ACK ")
             sock.sendto(ack_3, address)
             enable_keep_alive = 1
-    return sock,address_r
+    return sock, address_r
 
 
-def receiverSocket(host, port):
+def receiverSocket():
+    global sock_t
+    host = "127.0.0.1"
+    port = 12345
     address = (host, port)
     sock = sc.socket(sc.AF_INET, sc.SOCK_DGRAM)
+    sock_t = (sock, address)
     sock.bind(address)
     print("Waiting for connection...")
     data, address_r = sock.recvfrom(1500)
@@ -94,13 +101,15 @@ def receiverSocket(host, port):
     return sock, address_r
 
 
-def sender():
-    global seq, fragment_size, time_out, defaultFileDir, current_fileTypeCode, enable_keep_alive, sock_t
+def sender(sock, address_r):
+    global seq, fragment_size, time_out, defaultFileDir, current_fileTypeCode, enable_keep_alive
     print('Mode is Sender ...')
     while True:
         # connection established
-        print("1 -Text")
-        print("2 -File")
+        print("1- Text")
+        print("2- File")
+        print("3- would you like to close the connection (Y) or (N) :")
+
         # measure for the time, if greater than 1 sec, send keep-alive
         menu = input("Choose what would like to send : ")
 
@@ -120,7 +129,6 @@ def sender():
             lengthOfTheText = len(textToBeSent)
             # if no, send normally
             if lengthOfTheText <= fragment_size:
-
                 # if no, send normally
                 data = textToBeSent.encode()
                 crcValue = binascii.crc_hqx(data, 0)
@@ -325,7 +333,7 @@ def sender():
             continue
 
 
-def receiver():
+def receiver(sock, address_r):
     print('Mode is Receiver ...')
     global seq, fragment_size, headerSize, fullText, currentFileExtention, serverBuffer
     while True:
@@ -399,6 +407,7 @@ def receiver():
                     fullText = ""
                 else:
                     print("Unexpected Behaviour")
+
         elif headerInfo[0] == 2:
             if headerInfo[1] == 2:
                 currentFileExtention = TXT
@@ -526,8 +535,6 @@ def extractFileInfoFromPdfJpg(buffer):
     return foundAtIndex
 
 
-import threading
-
 start = time.time()
 
 
@@ -554,44 +561,66 @@ def my_inline_function():
 
 def main():
     global min_fragment_size, max_fragment_size, enable_keep_alive
-
     print("1- Server")
     print("2- Client")
 
     my_inline_function()
     while True:
-        mode = input("Please choose your mode (client or server) (1 or 2): ")
+        mode = input("Please choose your mode (1 or 2): ")
         if mode == "1":
-            host_l = input('Please enter destination address:  ')
-            port_l = input('Please enter destination port:  ')
-            sock, address = receiverSocket(host_l, port_l)
-            print("1- Sender")
-            print("2- Reciver")
-            choice = input("Please choose your mode (sender or receiver) (1 or 2): ")
-            if choice == '1':
-                print("you're sender")
-            elif choice == '2':
-                print("you're recevier")
-            else:
-                print("You've entered a bad mode, please choose correctly")
-            # receiver()
+            sock, address = receiverSocket()
+            receiver(sock,address)
             break
         elif mode == "2":
-            print("1- Sender")
-            print("2- Reciver")
-            choice = input("Please choose your mode (sender or receiver) (1 or 2): ")
-            if choice == '1':
-                print("you're sender")
-            elif choice == '2':
-                print("you're recevier")
-            else:
-                print("You've entered a bad mode, please choose correctly")
-
-
-            # sender()
+            host_l = input('Please enter destination address:  ')
+            port_l = input('Please enter destination port:  ')
+            sock, address = senderSocket(host_l,port_l)
+            sender(sock,address)
             break
         else:
             print("You've entered a bad mode, please choose correctly")
+
+
+# print("1- Server")
+# print("2- Client")
+# my_inline_function()
+# mode = input("Please choose your mode (client or server) (1 or 2): ")
+# if mode == "1":
+#     sock, address = receiverSocket()
+#     sock_t = sock
+#     receiver(sock, address)
+#     # value = 0
+#     # print("1- Sender")
+#     # print("2- Reciver")
+#     # choice = input("Please choose your mode (sender or receiver) (1 or 2): ")
+#     # if choice == '1':
+#     #     sender(sock, address)
+#     # elif choice == '2':
+#     #     receiver(sock, address)
+#     # else:
+#     #     print("You've entered a bad mode, please choose correctly")
+#     #     # break
+#
+# elif mode == "2":
+#     host_l = input('Please enter destination address:  ')
+#     port_l = input('Please enter destination port:  ')
+#     sock, address = senderSocket(host_l, port_l)
+#     sock_t = sock
+#     value = 0
+#     sender(sock, address)
+#     # print("1- Sender")
+#     # print("2- Reciver")
+#     # choice = input("Please choose your mode (sender or receiver) (1 or 2): ")
+#     # if choice == '1':
+#     #     sender(sock, address)
+#     # elif choice == '2':
+#     #     receiver(sock, address)
+#     # else:
+#     #     print("You've entered a bad mode, please choose correctly")
+#
+#
+# else:
+#     print("You've entered a bad mode, please choose correctly")
 
 
 if __name__ == "__main__":
