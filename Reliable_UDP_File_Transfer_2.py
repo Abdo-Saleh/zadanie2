@@ -10,8 +10,8 @@ header = Struct('BBHHHH')
 headerSize = calcsize('BBHHHH')
 
 supported_file_types_codes = {
-  ".txt": 2,
-  ".pdf": 3
+    ".txt": 2,
+    ".pdf": 3
 }
 current_fileTypeCode = supported_file_types_codes[".txt"]
 
@@ -24,7 +24,7 @@ max_fragment_size = 1462
 
 enable_loging = True
 
-defaultFileDir = os.getcwd()+"\\Test"
+defaultFileDir = os.getcwd() + "\\Test"
 
 fragment_size = 1
 
@@ -114,6 +114,7 @@ def sender():
                 # connection established
                 print("1 -Text")
                 print("2 -File")
+                 # measure for the time, if greater than 1 sec, send keep-alive
                 menu = input("Choose what would like to send : ")
                 if menu == '1':
                     print("Sending Text ......")
@@ -190,6 +191,10 @@ def sender():
                         else:
                             print("The text has been received with errors")
                 elif menu == '2':
+                    enable_simulation = input("Would you like to simulate of file transfer error, (Y)es, (N)o ")
+                    if enable_simulation == "Y":
+                        print("some random data would be inserted instead of a real packet")
+
                     print("Sending File ........")
                     filelocation = input(
                         "Enter the File location where your file exits (Default) {}:".format(defaultFileDir))
@@ -204,6 +209,7 @@ def sender():
                         current_fileTypeCode = supported_file_types_codes[file_extension]
 
                         fileContent = f.read()
+                        f.close()
                     except IOError:
                         print("Error: File does not appear to exist.")
                         continue
@@ -220,7 +226,16 @@ def sender():
                         fragment.extend(fileContent)
                         crcValue = binascii.crc_hqx(fragment, 0)
                         seq = seq + 1
-                        head = header.pack(2, current_fileTypeCode, seq, 1, len(fileContent) + lengthOfTheFileName, crcValue)
+                        head = header.pack(2, current_fileTypeCode, seq, 1, len(fileContent) + lengthOfTheFileName,
+                                           crcValue)
+
+                        if enable_simulation == "Y":
+                            fileName_s = fileName + str(int(time.time()))
+                            fragment = bytearray()
+                            # data = fileName.encode()
+                            fragment.extend(fileName_s.encode())
+                            fragment.extend(fileContent)
+
                         packet = b"".join([head, fragment])
                         sock.sendto(packet, address_r)
                         if enable_loging:
@@ -236,11 +251,27 @@ def sender():
                                 wasItSentSuccessfully = True
                             elif headerInfo[0] == 0:
                                 if enable_loging:
-                                    print('Text has been received with problems')
-                                    print('The Text is being resent again')
+                                    print('File has been received with problems')
+                                    print('The File is being resent again')
+
+                                if enable_simulation == "Y":
+                                    fragment = bytearray()
+                                    fragment.extend(fileName.encode())
+                                    fragment.extend(fileContent)
+                                    crcValue = binascii.crc_hqx(fragment, 0)
+
+                                head = header.pack(2, current_fileTypeCode, seq, 1,
+                                                   len(fileContent) + lengthOfTheFileName,
+                                                   crcValue)
+                                packet = b"".join([head, fragment])
+
+                                #fix the error and resend it
                                 sock.sendto(packet, address_r)
+
                                 packet, address_r = sock.recvfrom(1500)
                                 headerInfo = header.unpack(packet[:headerSize])
+                                if headerInfo[0] == 4:
+                                    wasItSentSuccessfully = True
                             else:
                                 if enable_loging:
                                     print('Text has been received with some thing idk')
@@ -260,7 +291,8 @@ def sender():
                             end = seq * fragment_size
                             fragment = fileNameWithContent[start:end]
                             crcValue = binascii.crc_hqx(fragment, 0)
-                            head = header.pack(2, current_fileTypeCode, seq, numberOfNeededFragments, len(fragment), crcValue)
+                            head = header.pack(2, current_fileTypeCode, seq, numberOfNeededFragments, len(fragment),
+                                               crcValue)
                             packet = b"".join([head, fragment])
                             sock.sendto(packet, address_r)
                             if int(time.time() - start_exec) >= time_out:
@@ -381,12 +413,12 @@ def receiver():
                                 crc_for_received_fragment = binascii.crc_hqx(fragmentToBeReceived, 0)
 
                         if seq < numberOfexpectedFragments:
-                          print("The text is being downloaded")
+                            print("The text is being downloaded")
                         elif seq == numberOfexpectedFragments:
                             print("The text has been received successfully {}".format(fullText))
                             fullText = ""
                         else:
-                          print("Unexpected Behaviour")
+                            print("Unexpected Behaviour")
                 elif headerInfo[0] == 2:
                     if headerInfo[1] == 2:
                         currentFileExtention = TXT
@@ -400,10 +432,11 @@ def receiver():
                         # File name was sent as one part
                         if enable_loging:
                             print("File is being recevied as one part ....")
-
                         fileToBeRecevied = packet[headerSize:]
                         crc_for_received_file = binascii.crc_hqx(fileToBeRecevied, 0)
                         wasItReceivedSuccessfully = False
+                        fileAtRecevier = bytearray()
+                        fileAtRecevier.extend(packet[headerSize:])
                         while not wasItReceivedSuccessfully:
                             if crc_for_received_file == headerInfo[5]:
                                 head = header.pack(4, headerInfo[1], headerInfo[2], headerInfo[3], headerInfo[4],
@@ -411,8 +444,6 @@ def receiver():
                                 packet = b"".join([head, fileToBeRecevied])
                                 wasItReceivedSuccessfully = True
                                 sock.sendto(packet, address_r)
-                                fileAtRecevier = bytearray()
-                                fileAtRecevier.extend(packet[headerSize:])
                                 receivedFragment = fileAtRecevier.decode().split(".")
                                 fileNameAtRecevier = receivedFragment[0]
                                 fileContent = receivedFragment[1][len(currentFileExtention) - 1:]
@@ -438,13 +469,12 @@ def receiver():
 
                                 packet = b"".join([head, fileAtRecevier])
                                 sock.sendto(packet, address_r)
+                                wasItReceivedSuccessfully = True
                                 if enable_loging:
+                                    print(header.unpack(head))
+                                    print(packet[headerSize:])
                                     print("Sent invalid state for the file fragment")
-                                packet, address = sock.recvfrom(1500)
-                                headerInfo = header.unpack(packet[:headerSize])
-                                # fileAtRecevier = bytearray()
-                                # fileAtRecevier.extend(packet[headerSize:])
-                                crc_for_received_file = binascii.crc_hqx(fileAtRecevier, 0)
+                            fileAtRecevier = bytearray()
                     else:
                         # file is being transfered by multi fragments
                         seq = headerInfo[2]
@@ -465,13 +495,8 @@ def receiver():
                                 head = header.pack(0, headerInfo[1], headerInfo[2], headerInfo[3], headerInfo[4],
                                                    headerInfo[5])
                                 packet = b"".join([head, fragmentToBeReceived])
-
                                 sock.sendto(packet, address_r)
                                 print("Sent invalid state for the fragment {}".format(headerInfo[2]))
-                                packet, address = sock.recvfrom(1500)
-                                headerInfo = header.unpack(packet[:headerSize])
-                                fragmentToBeReceived = packet[headerSize:]
-                                crc_for_received_fragment = binascii.crc_hqx(fragmentToBeReceived, 0)
 
                         if seq < numberOfexpectedFragments and enable_loging:
                             print("The file is being downloaded")
@@ -504,15 +529,17 @@ def receiver():
                         else:
                             print("Unexpected Behaviour")
 
+
 def extractFileInfoFromPdf(buffer):
     foundAtIndex = -1
     for x in range(0, len(buffer), 1):
         if buffer[x:x + 4].decode() == '.pdf':
-            foundAtIndex =  x
+            foundAtIndex = x
             break;
         else:
             foundAtIndex = -1
     return foundAtIndex
+
 
 def main():
     global min_fragment_size, max_fragment_size
@@ -529,7 +556,7 @@ def main():
             break
         else:
             print("You've entered a bad mode, please choose correctly")
-            continue;
+            continue
 
     return
 
