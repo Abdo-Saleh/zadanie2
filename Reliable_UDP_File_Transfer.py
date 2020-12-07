@@ -46,7 +46,7 @@ currentFileExtention = TXT
 
 serverBuffer = bytearray()
 
-host = "127.0.0.1"
+host = "192.168.0.102"
 port = 12345
 seq = 1
 
@@ -90,6 +90,7 @@ def receiverSocket():
     sock.bind(address)
     print("Waiting for connection...")
     data, address_r = sock.recvfrom(1500)
+    print(address_r)
     returned_value = (data, address_r)
     if returned_value:
         syn_3_r = header.unpack(data)
@@ -407,7 +408,7 @@ def receiver(sock, address_r):
     print('Mode is Receiver ...')
     global seq, fragment_size, headerSize, fullText, currentFileExtention, serverBuffer, value
     while True:
-        time.sleep(10)
+        # time.sleep(10)
         packet, address = sock.recvfrom(1500)
         headerInfo = header.unpack(packet[:headerSize])
         numberOfexpectedFragments = headerInfo[3]
