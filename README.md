@@ -3,7 +3,7 @@
 
 [![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/joemccann/dillinger)
 
-#### Under development - functional but needs refarctoring
+#### Under development - functional but needs refactoring
 
 
 # Application Features:
